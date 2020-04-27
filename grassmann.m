@@ -168,8 +168,8 @@ GProduct::usage = "GProduct[expr, {x, xs}] returns the ** product of expr with x
 Begin["`Private`"]
 
 (* Notation for differential operators *)
-Notation`AutoLoadNotationPalette = False;
-<<Notation`
+(*Notation`AutoLoadNotationPalette = False;
+<<Notation`*)
 
 (*Notation[ParsedBoxWrapper[
 FractionBox[
@@ -200,6 +200,7 @@ SetAttributes[DOp,Listable];
 (* Modified by Jeremy, Nov. 2006 to minimize recursion *)
 Grading[ a_Plus ] := Max @@ (Grading /@ (List @@ a));
 Grading[ a_Times ] := Plus @@ (Grading /@ (List @@ a));
+Grading[ 1/a_]:=-Grading[a];
 Grading[ a_NonCommutativeMultiply ] := Plus @@ (Grading /@ (List @@ a));
 Grading[ Unevaluated[Derivative[__][f_][x__]] ] := Grading[f[x]];
 (* End Jeremy's 2006 modifications *)
@@ -229,11 +230,12 @@ GD[ a_, b_ ] := 0 /; FreeQ[a, b];
 GD[ a_ + b_, c_ ] := GD[a, c] + GD[b, c];
 (* Jeremy Michelson's 2004 modification:
     a or b bosonic does not imply a AND b bosonic! *)
-GD[ a_ b_, c_ ] := GD[b, c]**a + GD[a, c]**b;
+GD[ a_ b_, c_ ] := (GD[b, c]**a + GD[a, c]**b)/.c->0;
 (* End Jeremy Michelson's modification *)
-GD[ a_ ** b_, c_ ] := GD[a, c] ** b + (-1)^Grading[a] a ** GD[b, c];
+GD[ a_ ** b_, c_ ] := (GD[a, c] ** b + (-1)^Grading[a] a ** GD[b, c])/.c->0;
 
-GD[1/f_,\[Theta]_]:=-(GD[f,\[Theta]]/(f/.{\[Theta]->0})^2);
+GD[f_/g_,\[Theta]_]/;FreeQ[f,\[Theta]]:=-f ** GD[g,\[Theta]]/GPower[g/.{\[Theta]->0},2];
+GD[1/g_,\[Theta]_]:=-GD[g,\[Theta]]/GPower[g/.{\[Theta]->0},2];
 SetAttributes[ GD, Listable];
 
 (* Jeremy Michelson's 2004 addition *)
@@ -268,6 +270,8 @@ GetGradeds[a___] := GetGradeds[a] = Select[{a}, FreeQ[#,DD] && Grading[#] != 0 &
 GetFermions[a___] := GetFermions[a] = Select[{a}, FreeQ[#,DD] && OddQ[Grading[#]] &];
 GetOperators[a___]:= GetOperators[a] = Select[{a},!FreeQ[#,DD]&];
 GetFermionOperators[a___]:= GetFermionOperators[a] = Select[{a},!FreeQ[#,DD] && OddQ[Grading[#]] &];
+(*Multiply through fractions before anything else *)
+NonCommutativeMultiply[a___]/; !And@@(Denominator[#]===1&)/@{a} := NonCommutativeMultiply@@Numerator/@ {a}/NonCommutativeMultiply@@Denominator/@{a};
 (* First make sure purely commutative stuff, for which
    OrderedQ[{}]==True, or products with only one
    noncommutative factor, come out right.  As a byproduct, this will fix
